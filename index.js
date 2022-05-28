@@ -250,6 +250,15 @@ async function run() {
         res.status(403).send({ message: "Forbidden access" });
       }
     });
+
+    // delete orders
+    app.delete("/delete/:id", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await ordersCollection.deleteOne(query);
+      res.send(result);
+    });
   } finally {
   }
 }
