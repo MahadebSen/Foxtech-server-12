@@ -17,12 +17,38 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
+function verifyJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+  const token = authHeader.split(" ")[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+    if (err) {
+      return res.status(403).send({ message: "Forbidden access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+}
+
+const varifyAdmin = async (req, res, next) => {
+  const requester = req.decoded.email;
+  const requesterAccount = await usersCollection.findOne(requester);
+  if (requesterAccount.role === "admin") {
+    next();
+  } else {
+    res.status(403).send("Forbidden");
+  }
+};
+
 async function run() {
   try {
     await client.connect();
     const productsCollection = client.db("foxtech").collection("products");
     const usersCollection = client.db("foxtech").collection("users");
     const ordersCollection = client.db("foxtech").collection("orders");
+    const reviewsCollection = client.db("foxtech").collection("reviews");
 
     // get all products
     app.get("/products", async (req, res) => {
@@ -60,7 +86,6 @@ async function run() {
     app.put("/products/:id", async (req, res) => {
       const id = req.params.id;
       const updatedProduct = await req.body;
-      console.log(req.body);
       const order = {
         img: updatedProduct.img,
         name: updatedProduct.name,
@@ -90,6 +115,140 @@ async function run() {
       );
       res.send(updateProduct || placedOrder);
       const placedOrder = await ordersCollection.insertOne(order);
+    });
+
+    // get specific user's orders
+    app.get("/order", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const email = req.query.email;
+      if (decodedEmail === email) {
+        const query = { email: email };
+        const orders = await ordersCollection.find(query).toArray();
+        res.send(orders);
+      } else {
+        res.status(403).send({ message: "Forbidden access" });
+      }
+    });
+
+    // get all reviews
+    app.get("/reviews", async (req, res) => {
+      const query = {};
+      const reviews = await reviewsCollection.find(query).toArray();
+      res.send(reviews);
+    });
+
+    // insert a review
+    app.post("/addreview", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const email = req.query.email;
+      if (decodedEmail === email) {
+        const review = req.body;
+        const addReview = await reviewsCollection.insertOne(review);
+        res.send(addReview);
+      } else {
+        res.status(403).send({ message: "Forbidden access" });
+      }
+    });
+
+    // get all users
+    app.get("/users", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const email = req.query.email;
+      if (decodedEmail === email) {
+        const query = {};
+        const users = await usersCollection.find(query).toArray();
+        res.send(users);
+      } else {
+        res.status(403).send({ message: "Forbidden access" });
+      }
+    });
+
+    // get all orders
+    app.get("/allorders", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const email = req.query.email;
+      if (decodedEmail === email) {
+        const query = {};
+        const orders = await ordersCollection.find(query).toArray();
+        res.send(orders);
+      } else {
+        res.status(403).send({ message: "Forbidden access" });
+      }
+    });
+
+    // insert new product
+    app.post("/addproduct", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const email = req.query.email;
+      if (decodedEmail === email) {
+        const product = req.body;
+        const addProduct = await productsCollection.insertOne(product);
+        res.send(addProduct);
+      } else {
+        res.status(403).send({ message: "Forbidden access" });
+      }
+    });
+
+    // get spacific user
+    app.get("/myprofile", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const email = req.query.email;
+      if (decodedEmail === email) {
+        const query = { email: email };
+        const user = await usersCollection.findOne(query);
+        res.send(user);
+      } else {
+        res.status(403).send({ message: "Forbidden access" });
+      }
+    });
+
+    // make admin
+    app.put("/user/admin/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const requester = req.decoded.email;
+      console.log(email);
+      const query = { email: requester };
+      const requesterAccount = await usersCollection.findOne(query);
+      if (requesterAccount.role === "admin") {
+        const filter = { email: email };
+        const updateDoc = {
+          $set: { role: "admin" },
+        };
+        const result = await usersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      } else {
+        res.status(403).send({ message: "Forbidden" });
+      }
+    });
+
+    // check admin role
+    app.get("/admin/:email", async (req, res) => {
+      const email = req.params.email;
+      const user = await usersCollection.findOne({ email: email });
+      const isAdmin = user.role === "admin";
+      res.send({ admin: isAdmin });
+    });
+
+    // update User
+    app.put("/user", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const email = req.query.email;
+      if (decodedEmail === email) {
+        const user = await req.body;
+        const filter = { email: email };
+        const options = { upsert: true };
+        const updateDoc = {
+          $set: user,
+        };
+        const updatedUser = await usersCollection.updateOne(
+          filter,
+          updateDoc,
+          options
+        );
+        res.send(updatedUser);
+      } else {
+        res.status(403).send({ message: "Forbidden access" });
+      }
     });
   } finally {
   }
