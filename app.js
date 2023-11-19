@@ -9,12 +9,15 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.6z6zt.mongodb.net/?retryWrites=true&w=majority`;
+// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.6z6zt.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@foxtech-cluster.fbbbtf2.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverApi: ServerApiVersion.v1,
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
 });
 
 function verifyJWT(req, res, next) {
@@ -45,10 +48,10 @@ const varifyAdmin = async (req, res, next) => {
 async function run() {
   try {
     await client.connect();
-    const productsCollection = client.db("foxtech").collection("products");
-    const usersCollection = client.db("foxtech").collection("users");
-    const ordersCollection = client.db("foxtech").collection("orders");
-    const reviewsCollection = client.db("foxtech").collection("reviews");
+    const productsCollection = client.db("FoxTech").collection("Products");
+    const usersCollection = client.db("FoxTech").collection("Users");
+    const ordersCollection = client.db("FoxTech").collection("Orders");
+    const reviewsCollection = client.db("FoxTech").collection("Reviews");
 
     // get all products
     app.get("/products", async (req, res) => {
@@ -270,5 +273,5 @@ app.get("/", (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log("Server is running...");
+  console.log(`Server is running on ${port}...`);
 });
